@@ -1,0 +1,31 @@
+{
+  "mqtt": {
+    "broker": "broker.hivemq.com",
+    "port": 1883,
+    "root_topic": "Verniti"
+  },
+  "interval_sec": 120,
+  "num_agents": 4,
+  "hosts": [
+    {
+      "name": "google-dns",
+      "address": "8.8.8.8",
+      "ports": [53]
+    },
+    {
+      "name": "cloudflare-dns",
+      "address": "1.1.1.1",
+      "ports": [53, 80]
+    },
+    {
+      "name": "openai",
+      "address": "api.openai.com",
+      "ports": [443]
+    },
+    {
+      "name": "example-web",
+      "address": "example.com",
+      "ports": [80, 443]
+    }
+  ]
+}
