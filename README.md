@@ -1,3 +1,4 @@
+@ -1,102 +1,111 @@
 # Rapporto di Progetto Sintetico: Monitoraggio Rete con MQTT
 
 ## 1. Introduzione
