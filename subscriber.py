@@ -5,7 +5,7 @@ host_states = {}
 
 def on_connect(client, userdata, flags, rc):
     print("Connected to MQTT broker.")
-    client.subscribe("Verniti/#")
+    client.subscribe("Verniti/google-dns/last_seen")
 
 
 def on_message(client, userdata, msg):

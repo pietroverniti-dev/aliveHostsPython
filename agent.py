@@ -16,6 +16,7 @@ class Agent(threading.Thread):
         while not self.stop_event.is_set():
             try:
                 host = self.in_queue.get(timeout=1)
+                self.in_queue.task_done()
             except queue.Empty:
                 continue
 
@@ -24,7 +25,6 @@ class Agent(threading.Thread):
 
             host.update_status(reachable, delay, port_results)
             self.out_queue.put(host)
-            self.in_queue.task_done()
 
     def ping_host(self, address):
         try:
@@ -41,7 +41,7 @@ class Agent(threading.Thread):
         result = {}
         for port in ports:
             s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            s.settimeout(1.0)
+            s.settimeout(0.25)
             try:
                 s.connect((address, port))
                 result[port] = "open"
