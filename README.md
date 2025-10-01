@@ -66,14 +66,23 @@ La comunicazione interna avviene tramite **Coda Output**.
 
 
 Schema a Blocchi del Flusso Dati
+
 [config.json]
+
 ↓
+
 [Thread Principale (main)]
+
 ↓
+
 [Coda Input] ←── [Thread Agenti (N)] ──→ [Coda Output]
+
 ↓
+
 [Publisher MQTT] ──→ [Broker MQTT]
+
 ↓
+
 [Subscriber MQTT]
 
 ## 7. Progettazione dei Componenti
