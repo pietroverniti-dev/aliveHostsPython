@@ -1,204 +1,112 @@
-# Monitoraggio Rete con MQTT
+# Rapporto di Progetto Sintetico: Monitoraggio Rete con MQTT
 
-## Introduzione
+## 1. Introduzione
 
-Monitorare i nodi di rete è fondamentale in qualsiasi infrastruttura IT. Questo progetto prevede un'applicazione Python che controlla regolarmente lo stato di diversi host (tramite ping e porte TCP) e invia i risultati via MQTT. Un client riceve questi dati e segnala eventuali problemi.
-
----
-
-## Descrizione del Problema
-
-L’obiettivo è creare un sistema in Python che:
-- Controlli una lista di host (IP o nome),
-- Verifichi la connessione con ping ICMP,
-- Controlli se alcune porte TCP sono aperte o chiuse,
-- Inviati i risultati su un broker MQTT con topic organizzati,
-- Usi un client MQTT per ricevere aggiornamenti e notificare problemi.
-
-Le impostazioni (IP, porte, ecc.) vengono lette da un file JSON.
+Il progetto sviluppa un'applicazione Python per il monitoraggio in tempo reale di host (ICMP/TCP).  
+I risultati vengono trasmessi asincronamente tramite MQTT (Message Queuing Telemetry Transport).
 
 ---
 
-## Analisi del Problema
+## 2. Descrizione del Problema
 
-Il sistema deve:
-- Gestire più controlli contemporaneamente,
-- Separare bene le funzioni: controllo, invio, ricezione e notifica,
-- Essere facile da espandere.
+L'obiettivo è creare un sistema che:
 
-Le difficoltà principali sono:
-- Gestire correttamente thread e code,
-- Usare bene i topic MQTT,
-- Eseguire i controlli a intervalli regolari.
+- Controlli host e porte definite in un file JSON.
+- Esegua verifiche ping ICMP e stato porte TCP.
+- Invii i dati su broker MQTT con topic standard (`<cognome>/<host>/...`).
+- Utilizzi un Client Subscriber separato per ricevere e notificare le anomalie (`unreachable`).
 
 ---
 
-## Requisiti – Specifiche di Progetto
+## 3. Analisi del Problema
+
+È richiesta un'architettura **modulare e concorrente**.  
+L'uso di **thread** e **code** (`input_queue`, `output_queue`) in Python è fondamentale per garantire l'efficienza e separare i compiti di controllo dalla pubblicazione.
+
+---
+
+## 4. Requisiti – Specifiche di Progetto
 
 ### Requisiti Funzionali
 
-| Requisito                    | Descrizione                                |
-|-----------------------------|--------------------------------------------|
-| Ping ICMP                   | Verifica se l’host è raggiungibile         |
-| Controllo porte TCP         | Verifica lo stato delle porte              |
-| Configurazione JSON         | Legge host, porte, intervalli, ecc.        |
-| Pubblicazione MQTT          | Su topic tipo `<cognome>/<host>/...`       |
-| Concorrenza                 | Uso di thread e code                       |
-| Client MQTT subscriber      | Riceve e segnala problemi                  |
+| Requisito          | Descrizione                                       |
+|--------------------|---------------------------------------------------|
+| Ping ICMP          | Verifica raggiungibilità e delay.                 |
+| Controllo porte TCP| Verifica stato (aperta/chiusa).                   |
+| Configurazione JSON| Caricamento parametri operativi.                  |
+| Pubblicazione MQTT | Invio risultati su topic con prefisso utente.     |
+| Concorrenza        | Uso di thread e code per esecuzione in parallelo. |
+| Client Subscriber  | Ricezione messaggi e notifica anomalie.           |
 
 ### Requisiti Non Funzionali
 
-- Codice strutturato e modulare
-- Librerie standard + `paho-mqtt`
-- Supporto per decine di host
-- Intervallo configurabile (es. 2 minuti)
-- Output in console e log
+- Il sistema deve essere **scalabile**.
+- Implementato in **Python 3.x**.
+- Utilizzo della libreria **paho-mqtt**.
+- Intervallo di monitoraggio **configurabile**.
 
 ---
 
-## Soluzione Proposta
+## 5. Soluzione Proposta
 
-La soluzione è composta da:
+Il sistema si basa su **thread comunicanti**:
 
-1. **Controllore Principale**: Legge la configurazione e avvia i thread.
-2. **Agenti (Agent)**: Fanno ping e controllano porte.
-3. **Publisher MQTT**: Invia i risultati.
-4. **Subscriber**: Riceve i dati e avvisa in caso di problemi.
+- **Thread Principale** (scheduling)
+- **Agenti** (controlli)
+- **Publisher** (invio MQTT)
+- **Subscriber** (notifica allarmi)
 
-La comunicazione avviene tramite due code: `input_queue` e `output_queue`.
-
----
-
-## Architettura della Soluzione
-
-### Schema a Blocchi
-
-[ config.json ]
-↓
-[ Thread principale ]
-↓
-[ Coda Input ] → [ Thread Agenti ] → [ Coda Output ] → [ Publisher MQTT ]
-↓
-[ Broker MQTT ]
-↓
-[ Subscriber MQTT ]
-↓
-[ Console / Log ]
-
+La comunicazione interna avviene tramite **Coda Output**.
 
 ---
 
-## Progettazione dei Componenti
+## 6. Architettura della Soluzione
 
-### Classe `Host`
-
-Contiene:
-- Nome, IP, porte
-- Stato (ping, porte)
-- Ultimo ping e data
-
-### Classe `Agent`
-
-Thread che:
-- Esegue ping
-- Controlla le porte
-- Aggiorna lo stato dell'host
-- Invia l’host aggiornato in output
-
-### Publisher
-
-Thread che:
-- Legge dalla coda di output
-- Pubblica su topic MQTT:
-  - `<cognome>/<host>/status`
-  - `<cognome>/<host>/delay`
-  - `<cognome>/<host>/last_seen`
-  - `<cognome>/<host>/ports/<porta>/state`
-
-### Thread Principale
-
-- Legge la configurazione
-- Crea gli oggetti `Host`
-- Avvia gli agenti e il publisher
-- Inserisce gli host nella coda input a intervalli
-
-### Subscriber
-
-Client MQTT che:
-- Si iscrive ai topic `<cognome>/#`
-- Tiene traccia dello stato degli host
-- Notifica se un host non risponde
-
----
-
-## Esempi di Topic MQTT
-
-| Topic                              | Esempio Payload            |
-|------------------------------------|-----------------------------|
-| `Verniti/server1/status`             | `reachable`                 |
-| `Verniti/server1/delay`              | `0.042`                     |
-| `Verniti/server1/last_seen`          | `2025-09-30T16:12:10Z`      |
-| `Verniti/server1/ports/22/state`     | `open`                      |
-
----
-
-## Diagramma di Flusso – Thread Agente
-
-┌─────────────────────┐
-│ Leggi host da input │
-└────────┬────────────┘
-↓
-┌─────────────────────┐
-│ Ping (ICMP) │
-└────────┬────────────┘
-↓
-┌─────────────────────┐
-│ Controllo porte TCP │
-└────────┬────────────┘
-↓
-┌─────────────────────┐
-│ Aggiorna oggetto │
-│ Host con risultati │
-└────────┬────────────┘
-↓
-┌─────────────────────┐
-│ Inserisci in output │
-│ queue │
-└─────────────────────┘
+### Schema a Blocchi del Flusso Dati
 
 
----
+Schema a Blocchi del Flusso Dati
++---------------+
+| config.json   |
++---------------+
+        ↓
++-----------------------+
+| Thread Principale     |
++-----------------------+
+        ↓ (Oggetto Host)
++--------------+        +-----------------+         +---------------------+
+| Coda Input   | ←──────| Thread Agenti(N)| ←────── | Coda Output         |
++--------------+        +-----------------+         +---------------------+
+                                  ↓ 
++----------------------+        +---------------------+
+| Publisher MQTT       | ──────>| Broker MQTT         |
++----------------------+        +---------------------+
+                                        ↓
+                                +---------------------+
+                                | Subscriber MQTT     |
+                                +---------------------+
 
-## Conclusioni e Note Finali
+## 7. Progettazione dei Componenti
+Classe Host (host.py): Struttura dati per lo stato (status, delay, porte).
 
-L’applicazione permette di monitorare host di rete, inviare i dati via MQTT e segnalare anomalie. La struttura modulare con thread e code la rende efficiente e scalabile.
+Classe Agent (agent.py): Thread che esegue ping/TCP e aggiorna lo stato Host.
 
-Possibili estensioni:
-- Notifiche Telegram o Email
-- Salvataggio su file/database
-- Interfaccia web
-- Supporto a protocolli come SNMP
+Publisher (publisher.py): Thread che legge dalla Coda Output e pubblica su MQTT.
 
----
+Subscriber (subscriber.py): Client che si iscrive ai topic e notifica gli errori.
 
-### Allegati – Codice Sorgente
+Topic MQTT: Struttura chiave: Verniti/server1/status, Verniti/server1/ports/22/state.
 
-- `host.py`: classe per rappresentare un host
-- `agent.py`: thread per controlli di rete
-- `main.py`: gestione generale del sistema
-- `publisher.py`: invia i risultati via MQTT
-- `subscriber.py`: riceve i dati e segnala problemi
-- `config.json`: configurazione host, porte, ecc.
+## 8. Conclusioni e Note Finali
+Il sistema è un monitoraggio efficiente e scalabile, basato sulla concorrenza Python e sulla notifica rapida via MQTT.
 
----
+Estensioni future: Notifiche avanzate (Telegram) e persistenza dei dati.
 
-### Istruzioni Finali
+## 9. Allegati: Codice Sorgente
 
-- Salva questo documento come `CognomeAliveHosts.md`.
-- Per convertirlo in PDF puoi usare:
-  - [Dillinger.io](https://dillinger.io/)
-  - [Typora](https://typora.io/)
-  - Oppure il comando Pandoc:
-
-```bash
-pandoc CognomeAliveHosts.md -o CognomeAliveHosts.pdf
+[host.py](host.py)
+[agent.py](agent.py)
+[main.py](main.py)
+[publisher.py](publisher.py)
+[subscriber.py](subscriber.py)
+[config.json](config.json)
