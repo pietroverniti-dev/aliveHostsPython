@@ -2,26 +2,27 @@
 
 ## 1. Introduzione
 
-Il progetto sviluppa un'applicazione Python per il monitoraggio in tempo reale di host (ICMP/TCP).  
-I risultati vengono trasmessi asincronamente tramite MQTT (Message Queuing Telemetry Transport).
+Il presente progetto ha come obiettivo lo sviluppo di un'applicazione in linguaggio Python per il monitoraggio in tempo reale di host di rete, mediante protocolli ICMP e TCP.  
+I risultati delle verifiche vengono trasmessi asincronamente tramite protocollo MQTT (Message Queuing Telemetry Transport), garantendo efficienza e scalabilità.
 
 ---
 
 ## 2. Descrizione del Problema
 
-L'obiettivo è creare un sistema che:
+L'applicazione deve implementare un sistema in grado di:
 
-- Controlli host e porte definite in un file JSON.
-- Esegua verifiche ping ICMP e stato porte TCP.
-- Invii i dati su broker MQTT con topic standard (`<cognome>/<host>/...`).
-- Utilizzi un Client Subscriber separato per ricevere e notificare le anomalie (`unreachable`).
+- Monitorare host e porte specificate in un file di configurazione JSON.
+- Eseguire controlli di raggiungibilità tramite ping ICMP.
+- Verificare lo stato delle porte TCP (aperte/chiuse).
+- Pubblicare i risultati su un broker MQTT utilizzando topic standardizzati (`<cognome>/<host>/...`).
+- Utilizzare un client subscriber separato per ricevere i messaggi e notificare eventuali anomalie (`unreachable`).
 
 ---
 
 ## 3. Analisi del Problema
 
-È richiesta un'architettura **modulare e concorrente**.  
-L'uso di **thread** e **code** (`input_queue`, `output_queue`) in Python è fondamentale per garantire l'efficienza e separare i compiti di controllo dalla pubblicazione.
+L'architettura richiesta è **modulare** e **concorrente**, al fine di garantire prestazioni elevate e separazione dei compiti.  
+L'utilizzo di **thread** e **code** (`input_queue`, `output_queue`) in Python consente una gestione efficiente dei processi di controllo e pubblicazione.
 
 ---
 
@@ -29,34 +30,34 @@ L'uso di **thread** e **code** (`input_queue`, `output_queue`) in Python è fond
 
 ### Requisiti Funzionali
 
-| Requisito          | Descrizione                                       |
-|--------------------|---------------------------------------------------|
-| Ping ICMP          | Verifica raggiungibilità e delay.                 |
-| Controllo porte TCP| Verifica stato (aperta/chiusa).                   |
-| Configurazione JSON| Caricamento parametri operativi.                  |
-| Pubblicazione MQTT | Invio risultati su topic con prefisso utente.     |
-| Concorrenza        | Uso di thread e code per esecuzione in parallelo. |
-| Client Subscriber  | Ricezione messaggi e notifica anomalie.           |
+| Requisito           | Descrizione                                         |
+|---------------------|-----------------------------------------------------|
+| Ping ICMP           | Verifica della raggiungibilità e misurazione del delay. |
+| Controllo porte TCP | Verifica dello stato delle porte (aperte/chiuse).   |
+| Configurazione JSON | Caricamento dei parametri operativi da file.        |
+| Pubblicazione MQTT  | Invio dei risultati su topic con prefisso utente.   |
+| Concorrenza         | Utilizzo di thread e code per esecuzione parallela. |
+| Client Subscriber   | Ricezione dei messaggi e notifica delle anomalie.   |
 
 ### Requisiti Non Funzionali
 
 - Il sistema deve essere **scalabile**.
-- Implementato in **Python 3.x**.
-- Utilizzo della libreria **paho-mqtt**.
-- Intervallo di monitoraggio **configurabile**.
+- Deve essere sviluppato in **Python 3.x**.
+- È richiesto l'utilizzo della libreria **paho-mqtt**.
+- L'intervallo di monitoraggio deve essere **configurabile**.
 
 ---
 
 ## 5. Soluzione Proposta
 
-Il sistema si basa su **thread comunicanti**:
+L'architettura si basa su thread comunicanti, ciascuno con un ruolo specifico:
 
-- **Thread Principale** (scheduling)
-- **Agenti** (controlli)
-- **Publisher** (invio MQTT)
-- **Subscriber** (notifica allarmi)
+- **Thread Principale**: gestisce lo scheduling e l'invio dei task.
+- **Agenti**: eseguono i controlli ICMP/TCP.
+- **Publisher**: pubblica i risultati su MQTT.
+- **Subscriber**: riceve i messaggi e notifica gli allarmi.
 
-La comunicazione interna avviene tramite **Coda Output**.
+La comunicazione interna tra thread avviene tramite una **coda di output** condivisa.
 
 ---
 
@@ -64,26 +65,17 @@ La comunicazione interna avviene tramite **Coda Output**.
 
 ### Schema a Blocchi del Flusso Dati
 
-
-Schema a Blocchi del Flusso Dati
-
+```text
 [config.json]
-
-↓
-
+      ↓
 [Thread Principale (main)]
-
-↓
-
+      ↓
 [Coda Input] ←── [Thread Agenti (N)] ──→ [Coda Output]
-
-↓
-
+      ↓
 [Publisher MQTT] ──→ [Broker MQTT]
-
-↓
-
+      ↓
 [Subscriber MQTT]
+```
 
 ## 7. Progettazione dei Componenti
 Classe Host (host.py): Struttura dati per lo stato (status, delay, porte).
